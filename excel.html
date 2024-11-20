@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excel工作簿合并工具</title>
+    <!-- 引入SheetJS库 -->
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    <style>
+        body {
+            font-family: '微软雅黑', sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+
+        .upload-area {
+            border: 2px dashed #ccc;
+            padding: 20px;
+            text-align: center;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+
+        .button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 10px 0;
+        }
+
+        .button:hover {
+            background-color: #45a049;
+        }
+
+        #fileList {
+            margin: 20px 0;
+        }
+
+        .file-item {
+            padding: 5px;
+            margin: 5px 0;
+            background-color: #f0f0f0;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Excel工作簿合并工具</h1>
+        <div class="upload-area">
+            <input type="file" id="fileInput" multiple accept=".xlsx,.xls" style="display: none;">
+            <button class="button" onclick="document.getElementById('fileInput').click()">选择Excel文件</button>
+            <p>或将文件拖放到这里</p>
+        </div>
+        <div id="fileList">
+            <h3>已选择的文件：</h3>
+        </div>
+        <button class="button" onclick="mergeExcel()" id="mergeButton" disabled>合并文件</button>
+    </div>
+
+    <script>
+        let selectedFiles = [];
+
+        // 文件选择处理
+        document.getElementById('fileInput').addEventListener('change', handleFileSelect);
+        
+        // 拖放处理
+        const uploadArea = document.querySelector('.upload-area');
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.style.borderColor = '#4CAF50';
+        });
+
+        uploadArea.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            uploadArea.style.borderColor = '#ccc';
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.style.borderColor = '#ccc';
+            handleFiles(e.dataTransfer.files);
+        });
+
+        function handleFileSelect(e) {
+            handleFiles(e.target.files);
+        }
+
+        function handleFiles(files) {
+            selectedFiles = Array.from(files);
+            updateFileList();
+            document.getElementById('mergeButton').disabled = selectedFiles.length < 2;
+        }
+
+        function updateFileList() {
+            const fileList = document.getElementById('fileList');
+            fileList.innerHTML = '<h3>已选择的文件：</h3>';
+            selectedFiles.forEach(file => {
+                const fileItem = document.createElement('div');
+                fileItem.className = 'file-item';
+                fileItem.textContent = file.name;
+                fileList.appendChild(fileItem);
+            });
+        }
+
+        async function mergeExcel() {
+            if (selectedFiles.length < 2) {
+                alert('请至少选择两个Excel文件！');
+                return;
+            }
+
+            try {
+                let mergedData = [];
+
+                for (let file of selectedFiles) {
+                    const data = await readExcelFile(file);
+                    mergedData = mergedData.concat(data);
+                }
+
+                // 创建新的工作簿
+                const wb = XLSX.utils.book_new();
+                const ws = XLSX.utils.json_to_sheet(mergedData);
+                XLSX.utils.book_append_sheet(wb, ws, "合并结果");
+
+                // 下载合并后的文件
+                XLSX.writeFile(wb, "合并结果.xlsx");
+            } catch (error) {
+                alert('处理文件时出错：' + error.message);
+            }
+        }
+
+        function readExcelFile(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const data = e.target.result;
+                        const workbook = XLSX.read(data, { type: 'array' });
+                        const firstSheetName = workbook.SheetNames[0];
+                        const worksheet = workbook.Sheets[firstSheetName];
+                        const jsonData = XLSX.utils.sheet_to_json(worksheet);
+                        resolve(jsonData);
+                    } catch (error) {
+                        reject(error);
+                    }
+                };
+                reader.onerror = reject;
+                reader.readAsArrayBuffer(file);
+            });
+        }
+    </script>
+</body>
+</html>
